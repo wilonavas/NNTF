@@ -4,19 +4,23 @@ import time
 
 #
 # This is a test to benchmark how tensorflow performance
-# scales with vector size.  There should be an optimal 
-# vector size that minimizes transfers (copy)
+# scales with vector size. 
 #
 
+# Create matrices with random data
 Alist = []
 for i in range(8,9):
     Nx = int(2**(i/2))
     # Nx = i*1024
     An = tf.random.uniform((Nx,Nx),dtype=tf.float32)
     Alist.append(An)
+
+# Detect tensorflow version
 fullver = tf.version.VERSION
 ver = int(fullver.split('.')[0])
 print('API Version: ',fullver)
+
+# Do a thousand matrix multiplications
 for _ in range(10000):
     if ver == 1:
         with tf.compat.v1.Session() as sess:
