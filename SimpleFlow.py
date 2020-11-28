@@ -2,6 +2,12 @@ import tensorflow as tf
 import numpy as np
 import time
 
+#
+# This is a test to benchmark how tensorflow performance
+# scales with vector size.  There should be an optimal 
+# vector size that minimizes transfers (copy)
+#
+
 Alist = []
 for i in range(8,9):
     Nx = int(2**(i/2))
