@@ -4,8 +4,7 @@ import time
 
 #
 # This is a test to benchmark how tensorflow performance
-# scales with vector size.  There should be an optimal 
-# vector size that minimizes transfers (copy)
+# scales with vector size. 
 #
 
 Alist = []
