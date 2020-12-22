@@ -22,28 +22,28 @@ class LrModel:
         self.B = self.initvar(Bs)
         self.C = self.initvar(Cs)
         self.vars = (self.A,self.B,self.C)
-
-        self.RegWeight  = 0.
-        self.RegType    = 1.
+        
+        self.RegWeight  = 0.01
+        self.RegType    = 0.5
         self.AscWeight  = 0.
         self.MaxIter    = 50000
-        self.MaxDelta   = 1e-8
-        self.MaxLoss    = 3e-3
-        self.MovAvgCount = 10
-        self.opt_lrate = 0.01
+        self.MaxDelta   = 1e-7
+        self.MaxLoss    = 1e-3
+        self.MovAvgCount = 100
+        self.opt_lrate = 0.05
         self.opt_persitence = True
         
         self.opt = tf.keras.optimizers.Adam(learning_rate=self.opt_lrate)
         # self.opt = tf.keras.optimizers.SGD(learning_rate=.01)
         # self.opt = tf.optimizers.Adagrad(learning_rate=1)
         # self.opt = tf.optimizers.Nadam(learning_rate=0.002, beta_1=0.9, beta_2=0.999)
-
+    def Eop(self):
+        return tf.matmul(self.A,self.B,transpose_b=True)
+        
     def __call__(self):
-        op1 = tf.matmul(self.A,self.B,transpose_b=True)
-        # op2 = tf.maximum(op1,1e-15)
-        op3 = tf.tensordot(op1,self.C,[0,0])
-        # op4 = tf.maximum(op3,1e-15)
-        return op3
+        # Eop = tf.matmul(self.A,self.B,transpose_b=True)
+        op = tf.tensordot(self.Eop(),self.C,[0,0])
+        return op
 
     def initvar(self,shape):
         v = tf.Variable(
@@ -54,21 +54,6 @@ class LrModel:
                 # mean=0.5, stddev=0.05)
         )
         return v
-    
-    @property
-    def E_np(self):
-        Eop = tf.matmul(self.A,self.B,transpose_b=True)
-        return Eop.numpy()
-        # return self.E.numpy()
-    @property
-    def C_np(self):
-        return self.C.numpy()
-    @property
-    def Y_np(self):
-        return self.Y.numpy()
-    @property
-    def Yprime(self):
-        return self().numpy()
     
     def loss(self):
         se = tf.math.squared_difference(self.Y,self())
@@ -82,24 +67,17 @@ class LrModel:
         return tc
     
     def reg_term(self):
-        # self.E.assign(tf.matmul(self.A,self.B))
-        Eop = tf.matmul(self.A,self.B,transpose_b=True)
-        N=np.prod(Eop.shape)
-        reg = tf.norm(tf.abs(Eop),self.RegType)
-        scale = N**(1/self.RegType)
-        reg = reg/scale * self.RegWeight 
-        reg = reg * self.RegWeight 
+        reg = tf.pow(tf.abs(self.Eop()),self.RegType)
+        reg = tf.pow(tf.reduce_mean(reg),1/self.RegType)
+        reg = reg*(self.RegWeight)
         return reg
     
     def asc_term(self):
-        Eop = tf.matmul(self.A,self.B,transpose_b=True)
-        N = np.prod(Eop.shape)
-        Eop = tf.reduce_sum(Eop,axis=0)
-        se = tf.math.squared_difference(Eop,tf.ones_like(Eop))
-        # scale = N**2
-        mse = tf.reduce_mean(se)*self.AscWeight
-        rmse = tf.sqrt(mse)
-        return mse
+        Esum = tf.reduce_sum(self.Eop(),axis=0)
+        e = tf.abs(Esum - tf.ones_like(Esum))
+        mse = tf.reduce_mean(tf.pow(e,2))
+        rmse = tf.sqrt(mse)*self.AscWeight
+        return rmse
 
     def apply_anc(self,mode):
         ''' Abundance Nonnegativity constraint '''
@@ -175,7 +153,7 @@ class LrModel:
             mvect[i % mvect.size] = current_cost
             mavg_cost = np.mean(mvect)
             delta = old_cost - mavg_cost
-            if i%print_step == 0:
+            if i % print_step == 0:
                 et = time.time()-t0
                 fprint(current_cost, mavg_cost, i, current_loss, delta, et)
             i+=1

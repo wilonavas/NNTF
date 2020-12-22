@@ -12,20 +12,17 @@ def hsi2rgb(Y):
 
 def plot_decomposition(model, Sgt, Sprime, p):
     (K,R) = Sgt.shape
-    M=5
-    E = model.E_np
+    # Get model varianbles
+    Y = model.Y.numpy()
+    C = model.C.numpy()
+    E = model.Eop().numpy()
+    Yprime = model().numpy()
+    # Normalize
     E = E/np.max(E,axis=(1,2),keepdims=True)
-    # E = E/np.sum(E,axis=0,keepdims=True)
-    # E = E/np.max(E,axis=(1,2),keepdims=True)
-
-    C = model.C_np
     C = C/np.max(C,axis=1,keepdims=True)
-    Y = model.Y_np
-    Yprime = model.Yprime
-    #Cr = np.transpose(C)
-    #(p,Cr) = reorder(Cr,Sgt)
-
+    
     # Plot target tensor and reconstruction
+    M=5
     plt.subplot(M,R,1)
     plt.imshow(hsi2rgb(Y))
     plt.subplot(M,R,3)
@@ -79,7 +76,7 @@ def plot_endmembers(S1, S2):
     #plt.show()
  
 def get_endmembers(model,threshold, fromtarget=False, asc=False):
-    E = model.E_np
+    E = model.Eop().numpy()
     [R,I,J] = E.shape
     # Normalize spatial weights
     
@@ -92,8 +89,8 @@ def get_endmembers(model,threshold, fromtarget=False, asc=False):
     else:
         Em = E/np.max(E,axis=(1,2),keepdims=True)
         
-    Yprime = model.Yprime
-    Ytarget = model.Y_np
+    Yprime = model().numpy()
+    Ytarget = model.Y.numpy()
     [_,_,K] = Yprime.shape
     
     Sprime = np.zeros(shape=(K,R),dtype=np.float)

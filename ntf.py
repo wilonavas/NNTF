@@ -10,7 +10,7 @@ from utils import *
 # Load hsi in matlab format
 datapath = '../../MATLAB/ComponentAnalysisExperiments/data/'
 ## Avg singular values that are > 1
-# filename = 'h01-samson'; Lr = 8
+# filename = 'h01-samson'; Lr = 10
 # filename = 'h02-jasper'; Lr = 21
 filename = 'h03-urban'; Lr = 122
 
@@ -50,12 +50,10 @@ for i in range(30):
     # and reconstructed tensor
     Sprime = get_endmembers(model, .95)
     (Sprime,p) = reorder(Sprime,Sgt)
-    # Plot decomposition components
     plot_decomposition(model,Sgt,Sprime,p)
-    # plt.show()
+    plt.show()
 
     # Compute Fully Constrained Least Squares 
-    # A = fcls_np(Y,Sprime)
     A = fcls_np(Y,Sprime)
     Agt = read_agt(matdict)
     nx = math.floor(matdict['nx'])
@@ -63,7 +61,7 @@ for i in range(30):
     rmse = np.mean((A-Agt)**2, axis=1) ** 0.5
     print(f'{i+1} rmse: {rmse} avg: {np.mean(rmse):.4f}')
     plot_abundance(Agt,A,nx)
-    # plt.show()
+    plt.show()
 
 ####################################################
 ## This applies ANC after the factorization is done
@@ -85,5 +83,4 @@ for i in range(30):
 # rsme = tf.sqrt(tf.reduce_mean(tf.pow(Aref-Agt,2),axis=1))
 # print(f'REF: rmse: {rsme} avg: {tf.reduce_mean(rsme):.4f}')
 # plot_abundance(Agt,Aref,nx)
-
 
