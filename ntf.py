@@ -10,14 +10,14 @@ from utils import *
 # Load hsi in matlab format
 datapath = '../../MATLAB/ComponentAnalysisExperiments/data/'
 ## Avg singular values that are > 1
-# filename = 'h01-samson'; Lr = 10
-# filename = 'h02-jasper'; Lr = 21
-filename = 'h03-urban'; Lr = 122
+filename = 'h01-samson'; Lr = 31
+# filename = 'h02-jasper'; Lr = 8
+# filename = 'h0s3-urban'; Lr = 122
 
 ## Max singular value of Y(:,:,k) > 1
 # filename = 'h01-samson'; Lr = 12
 # filename = 'h02-jasper'; Lr = 46
-# filename = 'h03-urban'; Lr = 168
+# filename = 'h03-urban6'; Lr = 168
 
 matdict = sio.loadmat(datapath + filename)
 Y = matdict['hsiten']
@@ -30,20 +30,32 @@ Sgt = matdict['Sgt']
 # Y = Y/np.linalg.norm(Y, ord=2, axis=2, keepdims=True)
 
 ### L-inf Normalized on mode-2
-Y2max = np.max(Y,axis=2)
-Y2max = Y2max/np.max(Y2max)
-plt.imshow(Y2max, cmap=plt.cm.jet)
-Y = Y/np.max(Y,axis=2,keepdims=True)
+Ynmax = np.max(Y)
+Yninf = np.linalg.norm(Y, np.inf, axis=2, keepdims=True)
+Yn2 = np.linalg.norm(Y, 2, axis=2, keepdims=True)
+Y=Y/Yninf
+
+# plt.figure()
+# plt.subplot(1,3,1)
+# plt.imshow(hsi2rgb(Y/Ynmax), cmap=plt.cm.jet)
+# plt.subplot(1,3,2)
+# plt.imshow(hsi2rgb(Y/Yninf), cmap=plt.cm.jet)
+# plt.subplot(1,3,3)
+# y2rgb = hsi2rgb(Y/Yn2)
+# y2max = np.max(Y/Yn2)
+# y2rgbmax= np.max(y2rgb)
+# plt.imshow(y2rgb/y2rgbmax, cmap=plt.cm.jet)
+# plt.show()
 
 
 [I,J,K] = Y.shape
 [K,R] = Sgt.shape
 print(f'[I,J,K]=>[{I},{J},{K}]   [Lr,R]=>[{Lr},{R}]')
-
+print()
+    
 for i in range(30):
-    print()
     # Instanciate Model
-    model = LrModel(Y,Lr,R)
+    model = LrModel(Y,Lr,R,seed=i)
     model.run_optimizer()
 
     # Compute endmembers using spatial components
@@ -51,17 +63,15 @@ for i in range(30):
     Sprime = get_endmembers(model, .95)
     (Sprime,p) = reorder(Sprime,Sgt)
     plot_decomposition(model,Sgt,Sprime,p)
-    plt.show()
+    # plt.show()
 
     # Compute Fully Constrained Least Squares 
     A = fcls_np(Y,Sprime)
     Agt = read_agt(matdict)
     nx = math.floor(matdict['nx'])
-    #rmse = tf.sqrt(tf.reduce_mean(tf.pow(A-Agt,2),axis=1))
-    rmse = np.mean((A-Agt)**2, axis=1) ** 0.5
-    print(f'{i+1} rmse: {rmse} avg: {np.mean(rmse):.4f}')
+    mtx = compute_metrics(i,Sgt, Sprime, A, Agt)
     plot_abundance(Agt,A,nx)
-    plt.show()
+    # plt.show()
 
 ####################################################
 ## This applies ANC after the factorization is done

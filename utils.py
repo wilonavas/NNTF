@@ -99,7 +99,7 @@ def get_endmembers(model,threshold, fromtarget=False, asc=False):
     # count = tf.where(mask==True,1,0)
     count = np.sum(mask,axis=(1,2))
     for r in range(R):
-        print(f'Comp:{r} VectCount:{count[r]}')
+        # print(f'Comp:{r} VectCount:{count[r]}')
         if fromtarget :
             cand_vector = tf.boolean_mask(Ytarget,mask[r,:,:])
         else :
@@ -263,3 +263,34 @@ def reorder(x,y):
         # print(f'p={p}')
     xprime = x[:,p]
     return(xprime,p)
+
+def sad(x1,x2):
+    y = correlation(x1,x2,centered=False)
+    y = np.diag(y)
+    y = np.arccos(y)
+    return(y)
+
+def compute_metrics(i, Sgt, Sprime, A, Agt):
+    np.set_printoptions(formatter={'float': '{: 0.4f}'.format})
+    rmse = np.mean((A-Agt)**2, axis=1) ** 0.5
+    ravg = np.mean(rmse)
+    str_rmse = str(rmse).lstrip('[').rstrip(']')
+    angle = sad(Sgt,Sprime)
+    aavg = np.mean(angle)
+    str_angle = str(angle).lstrip('[').rstrip(']')
+    print(f'Trial: {i+1} sad: {str_angle} aavg: {aavg:.4f}' \
+        + f'  rmse: {str_rmse} ravg: {ravg:.4f}')
+    return (i,angle,rmse)
+
+def print_title():
+    print(' Iter  | loss      | cost      |' \
+            +' mavg      | delta     | iter/s | time')
+
+def print_train_step(current_cost, mavg_cost, i, current_loss, delta, et):
+    print(f'TrainStep {i:6} |{current_loss:10.3e}' \
+        + f' |{current_cost:10.3e}' \
+        + f' |{mavg_cost:10.3e}' \
+        + f' |{delta:10.3e}' \
+        + f' |{i/et:7.1f}' \
+        + f' |{et:5.0f}', \
+        end='\r', flush=True)
