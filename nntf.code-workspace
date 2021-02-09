@@ -4,5 +4,7 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.pythonPath": "C:\\Users\\wilo\\miniconda3\\envs\\tf\\python.exe"
+	}
 }

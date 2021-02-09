@@ -9,6 +9,8 @@ import numpy as np
 import time
 from utils import *
 
+tf.get_logger().setLevel('ERROR')
+
 class LrModel:
     def __init__(self,target,Lr,R,seed=0):
         # tf.debugging.set_log_device_placement(True)
@@ -26,15 +28,15 @@ class LrModel:
         
         self.RegWeight  = 0.0
         self.RegNorm    = 1.
-        self.AscWeight  = 0.
+        self.AscWeight  = 0.0
         self.MaxIter    = 50000
-        self.MaxDelta   = 1e-8
-        self.MaxLoss    = 1e-4
-        self.MovAvgCount = 10
-        self.opt_lrate = 0.002
-        self.opt_persitence = True
+        self.MaxDelta   = 1e-6
+        self.MaxLoss    = 1e-6
+        self.MovAvgCount = 1
+        self.lrate = 0.001
+        self.optim_persist = True
         
-        self.opt = tf.keras.optimizers.Adam(learning_rate=self.opt_lrate)
+        self.opt = tf.keras.optimizers.Adam(learning_rate=self.lrate)
         # self.opt = tf.keras.optimizers.SGD(learning_rate=.01)
         # self.opt = tf.optimizers.Adagrad(learning_rate=1)
         # self.opt = tf.optimizers.Nadam(learning_rate=0.002, beta_1=0.9, beta_2=0.999)
@@ -42,23 +44,17 @@ class LrModel:
         return tf.matmul(self.A,self.B,transpose_b=True)
         
     def __call__(self):
-        #Eop = tf.matmul(self.A,self.B,transpose_b=True)
-        self.apply_anc('relu')
         op1 = self.Eop()
         op = tf.tensordot(op1,self.C,[0,0])
-        # op = tf.maximum(op2,1e-15)
+        self.apply_anc('relu')
         return op
 
     def initvar(self,shape):
-        # Normal 6 sigma truncated
-        # m = 0.5
-        # sd = m/3.
-        
         # See Glorot normal initializer on 
-        m = 0.5
-        sd = np.sqrt(2./np.sum(shape))
-        init = tf.random.truncated_normal(shape=shape, dtype=tf.float32,
-                mean=m, stddev=sd, seed=self.seed)
+        # m = 0.5
+        # sd = np.sqrt(2./np.sum(shape))
+        # init = tf.random.truncated_normal(shape=shape, dtype=tf.float32,
+        #         mean=m, stddev=sd, seed=self.seed)
         ki = tf.keras.initializers.GlorotNormal(self.seed)
         init = ki(shape)
         
@@ -74,8 +70,8 @@ class LrModel:
     
     @tf.function 
     def cost(self):
-        tc = self.loss() + self.reg_term() \
-            + self.asc_term()
+        tc = self.loss() \
+            + self.reg_term() + self.asc_term()
         return tc
     
     def reg_term(self):
@@ -84,11 +80,11 @@ class LrModel:
         reg = reg*(self.RegWeight)
         return reg
     
-    def asc_term(self,lnorm=2.):
+    def asc_term(self):
         Esum = tf.reduce_sum(self.Eop(),axis=0)
-        a = tf.abs(Esum - tf.ones_like(Esum))
-        a = tf.reduce_mean(tf.pow(a,lnorm))*self.AscWeight
-        # rmse = tf.sqrt(mse)
+        diff2 = tf.pow(Esum - tf.ones_like(Esum),2)
+        a = tf.reduce_mean(diff2)*self.AscWeight
+        # a = tf.sqrt(a)
         return a
 
     def apply_anc(self,mode):
@@ -98,6 +94,7 @@ class LrModel:
             self.A.assign(tf.maximum(self.A,epsilon))
             self.B.assign(tf.maximum(self.B,epsilon))
             self.C.assign(tf.maximum(self.C,epsilon))
+            # self.C.assign(self.C + tf.reduce_min(self.C,axis=1,keepdims=True))
         elif mode=='reluAB':
             self.A.assign(tf.maximum(self.A,epsilon))
             self.B.assign(tf.maximum(self.B,epsilon))
@@ -122,20 +119,17 @@ class LrModel:
             curr_cost = self.cost()
         grads = tape.gradient(curr_cost,self.vars)
         opt.apply_gradients(zip(grads,self.vars))
-        # self.apply_anc('reluAB')
-        # Normalize columns of A
-        # self.normalize_columns_of_A()
         return curr_cost
 
-    def normalize_columns_of_A(self):
+    def max_norm_constraint(self):
         (a_norm, a_divs) = tf.linalg.normalize(self.A, \
-             ord='euclidean', axis=1, name=None)
+             ord='euclidean', axis=1)
         b_scaled = self.B * a_divs
         self.A.assign(a_norm)
         self.B.assign(b_scaled)
 
     def train(self):
-        lrate = self.opt_lrate
+        lrate = self.lrate
         with tf.GradientTape() as t:
             current_loss = self.loss()
         [dA,dB,dC] = t.gradient(current_loss, 
@@ -152,13 +146,13 @@ class LrModel:
         current_loss = current_cost
         mvect = np.ones(self.MovAvgCount)*1e10
         mavg_cost = np.mean(mvect)
-        delta = 1e10; print_step = 10
+        delta = 1e10; print_step = 11
         #for i in range(self.MaxIter):
         converged = False; i=0
         # print_title()
         while(not converged):
-            if not self.opt_persitence:
-                self.opt = tf.keras.optimizers.Adam(learning_rate=self.opt_lrate)
+            if not self.optim_persist:
+                self.opt = tf.keras.optimizers.Adam(learning_rate=self.lrate)
             current_cost = self.train_keras(self.opt).numpy()
             current_loss = self.loss().numpy()  
             old_cost = mavg_cost
