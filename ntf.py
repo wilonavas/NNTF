@@ -26,8 +26,7 @@ filenames = ('h01-samson','h02-jasper','h03-urban')
 lowranks = (24,28,116)
 lowranks = (8,40,220)
 filenames = ['usgs/synt-e4x64-03']
-lowranks = [8]
-
+lowranks = [64]
 for fn,Lr in zip(filenames,lowranks):
     matdict = sio.loadmat(datapath + fn)
     Y = matdict['hsiten']
