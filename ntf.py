@@ -8,11 +8,6 @@ from utils import *
 ##########################################################################-----
 # Load hsi in matlab format
 datapath = '../../MATLAB/ComponentAnalysisExperiments/data/'
-## Avg singular values that are > 1
-# filename = 'h01-samson'; Lr = 8
-# filename = 'h02-jasper'; Lr = 21
-# filename = 'h03-urban'; Lr = 122
-
 ## Max singular value of Y(:,:,k) > 1
 # filename = 'h01-samson'; Lr = 12
 # filename = 'h02-jasper'; Lr = 46
@@ -20,58 +15,78 @@ datapath = '../../MATLAB/ComponentAnalysisExperiments/data/'
 ## Best empirical:
 # filename = 'h01-samson'; Lr = 31
 # filename = 'h02-jasper'; Lr = 12
-# filename = 'h03-urban'; Lr = 40
+# filename = 'h03-urban'; Lr = 220
+
+## WHISPERS Paper L=(min(I,J)^2)/K
+# 95*95/(156*3) = 19
+# 100^2/(198*4) = 12
+# 307^2/(162*4) = 145
 trials = range(1)
-filenames = ('h01-samson','h02-jasper','h03-urban')
-lowranks = (24,28,116)
-lowranks = (8,40,220)
-filenames = ['usgs/synt-e4x64-03']
-lowranks = [64]
-for fn,Lr in zip(filenames,lowranks):
-    matdict = sio.loadmat(datapath + fn)
-    Y = matdict['hsiten']
-    Sgt = matdict['Sgt'] 
-    # R = 6
-    # Sgt = np.random.uniform(size=(Y.shape[2],R))
+filenames = ['usgs/synleg-e4s2-01',
+    'usgs/synleg-e4s2-02',
+    'usgs/synleg-e4s2-03',
+    'usgs/synleg-e4s2-04']
+# filenames = ['usgs/synleg-e4s2-04']
+# filenames = ['usgs/synt-e4x64-03']
+# filenames = ['h03-urban']
+lowranks = [16]
+parms = LrModelParameters()
+parms.lrate = 0.001
+parms.MaxDelta = 1e-8
+parms.RegWeight = 0.
+parms.AscWeight = 0.
 
-    ### L-inf Normalized on mode-2
-    Ynmax = np.max(Y)
-    Yninf = np.linalg.norm(Y, ord=np.inf, axis=2, keepdims=True)
-    Yn2 = np.linalg.norm(Y, ord=2, axis=2, keepdims=True)
-    Y=Y/Yninf
+AbundanceThreshold = 0.95
+AbundanceFromTarget = False
 
-    [I,J,K] = Y.shape
-    [K,R] = Sgt.shape
-    print(fn)
-    print(f'[I,J,K]=>[{I},{J},{K}]   [Lr,R]=>[{Lr},{R}]')
-    print()
+#for fn,Lr in zip(filenames,lowranks):
+for fn in filenames:
+    for Lr in lowranks:
+        matdict = sio.loadmat(datapath + fn)
+        Y = matdict['hsiten']
+        Sgt = matdict['Sgt']
+        Sname = matdict['Sname']
         
-    for i in trials:
-        # Instanciate Model
-        model = LrModel(Y,Lr,R,seed=i)
-        model.lrate = 0.001
-        model.MaxDelta = 1e-8
-        model.AscWeight = 0.01
-        model.run_optimizer()
-        AbundanceThreshold = 0.95
-        AbundanceFromTarget = False
+        # R = 6
+        # Sgt = np.random.uniform(size=(Y.shape[2],R))
 
-        # Compute endmembers using spatial components
-        # and reconstructed tensor
-        Sprime = get_endmembers(model, \
-            AbundanceThreshold, 
-            fromtarget=AbundanceFromTarget)
-        (Sprime,p) = reorder(Sprime,Sgt)
-        plot_decomposition(model,Sgt,Sprime,p)
-        plt.show()
+        ### L-inf Normalized on mode-2
+        Y = Y/np.max(Y)
+        Yninf = np.linalg.norm(Y, ord=np.inf, axis=2, keepdims=True)
+        Yn2 = np.linalg.norm(Y, ord=2, axis=2, keepdims=True)
+        Y=Y/Yninf
+        
+        [I,J,K] = Y.shape
+        [K,R] = Sgt.shape
+        print(fn)
+        print(f'[I,J,K]=>[{I},{J},{K}]   [Lr,R]=>[{Lr},{R}]')
+        parms.prnt()
 
-        # Compute Fully Constrained Least Squares 
-        A = fcls_np(Y,Sprime)
-        Agt = read_agt(matdict)
-        nx = math.floor(matdict['nx'])
-        mtx = compute_metrics(i,Sgt, Sprime, A, Agt)
-        plot_abundance(Agt,A,nx)
-        plt.show()
+        for i in trials:
+            # Instanciate Model
+            model = LrModel(Y,Lr,R,seed=i,parms=parms)
+            model.run_optimizer()
+            # Compute endmembers using spatial components
+            # and reconstructed tensor
+
+            Sprime = get_endmembers(model, 
+                AbundanceThreshold,
+                norms=Yninf,
+                fromtarget=AbundanceFromTarget)
+            (Sprime,p) = reorder(Sprime,Sgt)
+            print(f'Reorder: {p}')
+            # plot_decomposition(model,Sgt,Sprime,p)
+            # plt.show()
+
+            # Compute Fully Constrained Least Squares 
+            A = fcls_np(Y,Sprime)
+            Agt = read_agt(matdict)
+            nx = math.floor(matdict['nx'])
+            mtx = compute_metrics(i,Sgt, Sprime, A, Agt)
+            # plot_abundance(Agt,A,nx)
+            # plot_all(Agt,A,nx,model,Sgt,Sprime,p,Sname)
+            # plt.show()
+
 
 ####################################################
 ## This applies ANC after the factorization is done

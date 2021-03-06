@@ -25,12 +25,14 @@ def plot_decomposition(model, Sgt, Sprime, p):
     M=5
     plt.subplot(M,R,1)
     plt.imshow(hsi2rgb(Y))
+    plt.axis('off')
     plt.subplot(M,R,3)
     plt.imshow(hsi2rgb(Yprime))
     for i in range(R):
         # Plot Spatial Slab components
         plt.subplot(M,R,R+i+1)
         plt.imshow(E[p[i],:,:],cmap=plt.cm.jet)
+        plt.colorbar()
         # Plot Ground Truth Endmembers
         plt.subplot(M,R,R*2+i+1)
         plt.plot(Sgt[:,i])
@@ -65,6 +67,49 @@ def plot_abundance(A1, A2, nx):
         plt.imshow(A2_img[r,:,:],cmap=plt.cm.jet)
     #plt.show()
 
+def plot_all(A1,A2,nx,model,Sgt,Sprime,p,Sname):
+    [R,N] = A1.shape
+    ny = math.floor(N/nx)
+    A1_img = np.reshape(A1,(R,nx,ny))
+    A2_img = np.reshape(A2,(R,nx,ny))
+    prows = 4
+    Sgtninf = Sgt / np.max(Sgt,axis=0,keepdims=True)
+    Sgtnl2 = Sgt / np.linalg.norm(Sgt,axis=0,keepdims=True)
+    Spninf = Sprime / np.max(Sprime,axis=0,keepdims=True)
+    Spnl2 = Sprime / np.linalg.norm(Sprime,axis=0,keepdims=True)
+    for r in range(R):
+        name = Sname[r][0][0];
+        # Plot Ground Truth abundance
+        plt.subplot(prows,R,r+1)
+        plt.imshow(A1_img[r,:,:],cmap=plt.cm.jet)
+        plt.axis('off')
+        # plt.colorbar()
+        plt.title(name)
+
+        plt.subplot(prows,R,R+r+1)
+        plt.imshow(A2_img[r,:,:],cmap=plt.cm.jet)
+        plt.axis('off')
+        # plt.colorbar()
+
+        # Plot Ground Truth Endmembers
+        plt.subplot(prows,R,R*2+r+1)
+        plt.plot(Sgt[:,r],'r:',label='Ground Truth')
+        #plt.axis('off')
+        # Plot Reconstructed Endmembers
+        plt.plot(Sprime[:,r],'b-',label='Reconstructed')
+        #plt.legend(loc='lower right')
+        #plt.axis('off')
+        
+        # Plot Normalized Ground Truth Endmembers
+        plt.subplot(prows,R,R*3+r+1)
+        plt.plot(Sgtnl2[:,r],'r:',label='Ground Truth')
+        #plt.legend(loc='lower right')
+        #plt.axis('off')
+        # Plot Normalized Reconstructed Endmembers
+        plt.plot(Spnl2[:,r],'b-',label='Reconstructed')
+        #plt.legend(loc='lower right')
+        #plt.axis('off')
+        
 def plot_endmembers(S1, S2):
     [K,R] = S1.shape
     prows = 2
@@ -75,11 +120,10 @@ def plot_endmembers(S1, S2):
         plt.plot(S2[:,r])
     #plt.show()
  
-def get_endmembers(model,threshold, fromtarget=False, asc=False):
+def get_endmembers(model,threshold, norms=1., fromtarget=False, asc=False):
     E = model.Eop().numpy()
     [R,I,J] = E.shape
     # Normalize spatial weights
-    
     
     if asc:
         # E1 = E/np.max(E,axis=(1,2),keepdims=True)
@@ -89,8 +133,8 @@ def get_endmembers(model,threshold, fromtarget=False, asc=False):
     else:
         Em = E/np.max(E,axis=(1,2),keepdims=True)
         
-    Yprime = model().numpy()
-    Ytarget = model.Y.numpy()
+    Yprime = model().numpy()*norms
+    Ytarget = model.Y.numpy()*norms
     [_,_,K] = Yprime.shape
     
     Sprime = np.zeros(shape=(K,R),dtype=np.float)
@@ -115,8 +159,8 @@ def fcls_np(Yin, Sin):
     fcls_np() Elapsed time: 9.566718578338623 seconds
     rmse: [0.02025357 0.0487208  0.03135294 0.05578483]
     '''
-    # Sin = Sin / np.sqrt(np.sum(np.square(Sin),axis=0))
-    # Yin = Yin / np.sqrt(np.sum(np.square(Yin),axis=2,keepdims=True))
+    # Sin = Sin / np.max(Sin,axis=0,keepdims=True)
+    # Yin = Yin / np.max(Yin,axis=2,keepdims=True)
     t0 = time.time()
     Sin = Sin / np.linalg.norm(Sin,axis=0,keepdims=True)
     Yin = Yin / np.linalg.norm(Yin,axis=2,keepdims=True)
@@ -166,7 +210,7 @@ def fcls_np(Yin, Sin):
             et = time.time()-t0
             print(f'Iter: {n}  Time: {et:.4f}',\
                 end='\r', flush=True)
-    print(f'fcls time: {(time.time()-t0):.2f}')
+    #print(f'fcls time: {(time.time()-t0):.2f}')
     return A
 
 def fcls(Ynp, Snp):
@@ -185,8 +229,8 @@ def fcls(Ynp, Snp):
 
     (I,J,K) = Yin.shape; N=I*J
     (K,R) = Sin.shape
-    Ymat = tf.reshape(Yin,shape=(N,K))
-    A = tf.Variable(tf.zeros((R,N),dtype=tf.float32))
+    Ymat =  tf.Variable(tf.reshape(Yin,shape=(N,K)),dtype=tf.float32)
+    A = tf.Variable(tf.zeros((R,N)),dtype=tf.float32)
     # Select pixel to process
     # Iterate through pixels
     t0 = time.time()
@@ -231,7 +275,7 @@ def fcls(Ynp, Snp):
     print(f'fcls time: {(time.time()-t0):.2f}')
     return A.numpy()
 
-def correlation(x,y,centered=False):
+def correlation(x,y,centered=False,norm='l2'):
     ''' 
     This function computes the Pearson Correlation
     unless the optional argument centered is set to False.
@@ -242,16 +286,24 @@ def correlation(x,y,centered=False):
     if centered:
         x = x-np.mean(x,axis=0)
         y = y-np.mean(y,axis=0)
-    # Normalize inputs    
-    xn = x/np.linalg.norm(x,axis=0)
-    yn = y/np.linalg.norm(y,axis=0)
+    # Normalize inputs
+    if norm=='l2':
+        xn = x/np.linalg.norm(x,axis=0)
+        yn = y/np.linalg.norm(y,axis=0)
+    elif norm=='inf':
+        xn = x/np.max(x,axis=0)
+        yn = y/np.max(y,axis=0)
+    else:
+        print(f"Invalid Argument \'{norm}\'")
+
+
     # Compute dot products (same as matmul)
     corr = np.tensordot(xn,yn,axes=[0,0])
     return corr
 
 def reorder(x,y):
     [K,R] = x.shape
-    c = correlation(x,y)
+    c = correlation(x,y,norm='l2')
     p = np.zeros(R,dtype=np.int)
     for r in range(R,0,-1):
         max_idx = np.argmax(c)
