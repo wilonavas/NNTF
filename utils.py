@@ -4,9 +4,11 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 def hsi2rgb(Y):
-    Yb = np.mean(Y[:,:,0:60],axis=2)
-    Yg = np.mean(Y[:,:,60:120],axis=2)
-    Yr = np.mean(Y[:,:,120:-1],axis=2)
+    [nx,ny,nz] = Y.shape
+    cut = math.floor(nz/3)
+    Yb = np.mean(Y[:,:,0:cut],axis=2)
+    Yg = np.mean(Y[:,:,cut:2*cut],axis=2)
+    Yr = np.mean(Y[:,:,2*cut:-1],axis=2)
     Yrgb = np.stack([Yr,Yg,Yb],axis=2)
     return Yrgb
 
@@ -19,7 +21,7 @@ def plot_decomposition(model, Sgt, Sprime, p):
     Yprime = model().numpy()
     # Normalize
     E = E/np.max(E,axis=(1,2),keepdims=True)
-    C = C/np.max(C,axis=1,keepdims=True)
+    # C = C/np.max(C,axis=1,keepdims=True)
     
     # Plot target tensor and reconstruction
     M=5
@@ -132,9 +134,14 @@ def get_endmembers(model,threshold, norms=1., fromtarget=False, asc=False):
         Em = E1/np.max(E1,axis=(1,2),keepdims=True)
     else:
         Em = E/np.max(E,axis=(1,2),keepdims=True)
-        
-    Yprime = model().numpy()*norms
-    Ytarget = model.Y.numpy()*norms
+    
+    Yprime = model().numpy()
+    Ytarget = model.Y.numpy()
+    # Put intensities back on the reconstruction before
+    # Averaging out candidate endmembers
+    Yprime = Yprime*norms
+    Ytarget = Ytarget*norms
+    
     [_,_,K] = Yprime.shape
     
     Sprime = np.zeros(shape=(K,R),dtype=np.float)
@@ -152,16 +159,15 @@ def get_endmembers(model,threshold, norms=1., fromtarget=False, asc=False):
         Sprime[:,r] = mean_vector.numpy()
     return Sprime
 
-def fcls_np(Yin, Sin):
+def fcls_np(Yin, Sin, norms=1.):
     '''
     A[R,N] = fcls_np(Y[I,J,K], S[K,R])
     Numpy implementation
     fcls_np() Elapsed time: 9.566718578338623 seconds
     rmse: [0.02025357 0.0487208  0.03135294 0.05578483]
     '''
-    # Sin = Sin / np.max(Sin,axis=0,keepdims=True)
-    # Yin = Yin / np.max(Yin,axis=2,keepdims=True)
     t0 = time.time()
+
     Sin = Sin / np.linalg.norm(Sin,axis=0,keepdims=True)
     Yin = Yin / np.linalg.norm(Yin,axis=2,keepdims=True)
 

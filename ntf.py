@@ -16,25 +16,37 @@ datapath = '../../MATLAB/ComponentAnalysisExperiments/data/'
 # filename = 'h01-samson'; Lr = 31
 # filename = 'h02-jasper'; Lr = 12
 # filename = 'h03-urban'; Lr = 220
-
+## WHISPERS min(I,J)^2 / R*K
+# filename = 'h01-samson'; Lr = 19
+# filename = 'h02-jasper'; Lr = 12
+# filename = 'h03-urban'; Lr = 145
+## WHISPERS2 min(I,J)^2 / R*min(I,J,K)
+# filename = 'h01-samson'; Lr = 31
+# filename = 'h02-jasper'; Lr = 25
+# filename = 'h03-urban'; Lr = 145
 ## WHISPERS Paper L=(min(I,J)^2)/K
 # 95*95/(156*3) = 19
 # 100^2/(198*4) = 12
 # 307^2/(162*4) = 145
-trials = range(1)
-filenames = ['usgs/synleg-e4s2-01',
+trials = range(5)
+# filenames=[filename]
+# lowranks=[Lr]
+filenames = [
+    'usgs/synleg-e4s2-01',
     'usgs/synleg-e4s2-02',
     'usgs/synleg-e4s2-03',
     'usgs/synleg-e4s2-04']
-# filenames = ['usgs/synleg-e4s2-04']
-# filenames = ['usgs/synt-e4x64-03']
-# filenames = ['h03-urban']
-lowranks = [16]
+filenames = ['h03-urban6']
+lowranks = [200]
+# filenames = ['h02-jasper']
+# lowranks = [19]
+# nem=4
 parms = LrModelParameters()
 parms.lrate = 0.001
 parms.MaxDelta = 1e-8
-parms.RegWeight = 0.
+parms.RegWeight = 0.01
 parms.AscWeight = 0.
+parms.MovAvgCount = 10
 
 AbundanceThreshold = 0.95
 AbundanceFromTarget = False
@@ -51,16 +63,32 @@ for fn in filenames:
         # Sgt = np.random.uniform(size=(Y.shape[2],R))
 
         ### L-inf Normalized on mode-2
-        Y = Y/np.max(Y)
+        # Normalize Integers to float
+        Ymax = np.max(Y)
+        Y = Y/Ymax
+        # Get Max Intensity of each
         Yninf = np.linalg.norm(Y, ord=np.inf, axis=2, keepdims=True)
+        # Get Power of each pixel
         Yn2 = np.linalg.norm(Y, ord=2, axis=2, keepdims=True)
-        Y=Y/Yninf
+        # Normalize Intensity
+        Ynorm = Yninf
+        Y = Y/Ynorm
         
         [I,J,K] = Y.shape
         [K,R] = Sgt.shape
+        # if R > nem :
+        #     Sgt = Sgt[:,0:nem]
+        #     [K,R] = Sgt.shape
+        # elif nem > R:
+        #     Sgt2 = np.random.uniform(size=[K,nem])
+        #     Sgt2[:,0:R]=Sgt
+        #     Sgt=Sgt2
+        #     [K,R] = Sgt.shape
         print(fn)
         print(f'[I,J,K]=>[{I},{J},{K}]   [Lr,R]=>[{Lr},{R}]')
         parms.prnt()
+        # plt.imshow(hsi2rgb(Y))
+        # plt.show()
 
         for i in trials:
             # Instanciate Model
@@ -71,16 +99,24 @@ for fn in filenames:
 
             Sprime = get_endmembers(model, 
                 AbundanceThreshold,
-                norms=Yninf,
+                norms=Ynorm,
                 fromtarget=AbundanceFromTarget)
             (Sprime,p) = reorder(Sprime,Sgt)
             print(f'Reorder: {p}')
             # plot_decomposition(model,Sgt,Sprime,p)
             # plt.show()
 
-            # Compute Fully Constrained Least Squares 
-            A = fcls_np(Y,Sprime)
+            # Compute Fully Constrained Least Squares
+
+            A = fcls_np(Y,Sprime,norms=Ynorm)
             Agt = read_agt(matdict)
+            # [nax,nay]=Agt.shape
+            # if nax>R :
+            #     Agt = Agt[0:R,:]
+            # elif nax<R :
+            #     Agt2 = np.zeros(R,nay)
+            #     Agt2[0:nax,:] = Agt
+            #     Agt = Agt2
             nx = math.floor(matdict['nx'])
             mtx = compute_metrics(i,Sgt, Sprime, A, Agt)
             # plot_abundance(Agt,A,nx)

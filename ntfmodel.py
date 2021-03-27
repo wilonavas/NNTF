@@ -50,7 +50,7 @@ class LrModel:
      
         self.opt = tf.keras.optimizers.Adam(learning_rate=self.parms.lrate)
         # self.opt = tf.keras.optimizers.SGD(learning_rate=.01)
-        # self.opt = tf.optimizers.Adagrad(learning_rate=1)
+        # self.opt = tf.optimizers.Adagrad(learning_rate=0.001)
         # self.opt = tf.optimizers.Nadam(learning_rate=0.002, beta_1=0.9, beta_2=0.999)
     
     def Eop(self):
@@ -64,12 +64,6 @@ class LrModel:
         return tf.matmul(self.A,self.B,transpose_b=True)
         
     def __call__(self):
-        self.apply_anc('relu')
-        op1 = self.Eop()
-        op = tf.tensordot(op1,self.C,[0,0])
-        return op
-    
-    def decoder(self):
         self.apply_anc('relu')
         op1 = self.Eop()
         op = tf.tensordot(op1,self.C,[0,0])
