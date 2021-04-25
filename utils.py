@@ -3,13 +3,18 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-def hsi2rgb(Y):
+def hsi2rgb(Y,rgb=False):
     [nx,ny,nz] = Y.shape
-    cut = math.floor(nz/3)
+    if(rgb):
+        cut = 30
+    else:
+        cut = math.floor(nz/3)
+        
     Yb = np.mean(Y[:,:,0:cut],axis=2)
     Yg = np.mean(Y[:,:,cut:2*cut],axis=2)
     Yr = np.mean(Y[:,:,2*cut:-1],axis=2)
     Yrgb = np.stack([Yr,Yg,Yb],axis=2)
+    Yrgb = Yrgb/np.max(Yrgb)
     return Yrgb
 
 def plot_decomposition(model, Sgt, Sprime, p):
@@ -128,12 +133,8 @@ def get_endmembers(model,threshold, norms=1., fromtarget=False, asc=False):
     # Normalize spatial weights
     
     if asc:
-        # E1 = E/np.max(E,axis=(1,2),keepdims=True)
-        E1 = E/np.sum(E ,axis=0)
-        # E1 = E1 - np.min(E1,axis=(1,2),keepdims=True)
-        Em = E1/np.max(E1,axis=(1,2),keepdims=True)
-    else:
-        Em = E/np.max(E,axis=(1,2),keepdims=True)
+        E = E/np.sum(E ,axis=0)
+    Em = E/np.max(E,axis=(1,2),keepdims=True)
     
     Yprime = model().numpy()
     Ytarget = model.Y.numpy()
@@ -309,7 +310,7 @@ def correlation(x,y,centered=False,norm='l2'):
 
 def reorder(x,y):
     [K,R] = x.shape
-    c = correlation(x,y,norm='l2')
+    c = correlation(x,y,centered=False,norm='l2')
     p = np.zeros(R,dtype=np.int)
     for r in range(R,0,-1):
         max_idx = np.argmax(c)

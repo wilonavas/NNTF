@@ -12,7 +12,6 @@ datapath = '../../MATLAB/ComponentAnalysisExperiments/data/'
 # filename = 'h01-samson'; Lr = 12
 # filename = 'h02-jasper'; Lr = 46
 # filename = 'h03-urban'; Lr = 168
-
 ## Best empirical:
 # filename = 'h01-samson'; Lr = 31
 # filename = 'h02-jasper'; Lr = 12
@@ -29,39 +28,32 @@ datapath = '../../MATLAB/ComponentAnalysisExperiments/data/'
 # 95*95/(156*3) = 19
 # 100^2/(198*4) = 12
 # 307^2/(162*4) = 145
-# filenames = [
-#   'usgs/sgau-e4t4-01',
-    # 'usgs/sgau-e4t4-02',
-    # 'usgs/sgau-e4t4-03',
-    # 'usgs/sgau-e4t4-04']
-# filenames = ['h01-samson','h02-jasper', 'h03-urban']
-# lowranks = [50,50,220]
-# filenames = [
-#     'usgs/slmixed-90',
-#     'usgs/slmixed-80',
-#     'usgs/slmixed-75']
-# lowranks = [16,16,16,16]
+trials = range(1)
+# filenames=[filename]
+# lowranks=[Lr]
+filenames = [
+  'usgs/sgau-e4t4-01',
+    'usgs/sgau-e4t4-02',
+    'usgs/sgau-e4t4-03',
+    'usgs/sgau-e4t4-04']
+# filenames = ['h00-ipines2']
+#lowranks = [90]
 filenames = ['h03-urban6']
-lowranks = [12]
-
-trials = range(10)
+lowranks = [145,220]
+#nem=48
 parms = LrModelParameters()
 parms.lrate = 0.001
 parms.MaxDelta = 1e-8
+parms.RegWeight = 0.
+parms.AscWeight = 0.
+parms.MovAvgCount = 10
 
-parms.MaxIter = 20000
-parms.RegWeight = 0.0
-parms.RegNorm = 1.0
-parms.AscWeight = 0.0
-parms.MovAvgCount = 1
-parms.LimitMaxNorm = True
-
-AbundanceThreshold = 0.90
+AbundanceThreshold = 0.95
 AbundanceFromTarget = False
 
 #for fn,Lr in zip(filenames,lowranks):
-for fn,Lr in zip(filenames,lowranks):
-    # for Lr in lowranks:
+for fn in filenames:
+    for Lr in lowranks:
         matdict = sio.loadmat(datapath + fn)
         Yin = matdict['hsiten']
         Sgt = matdict['Sgt']
@@ -75,14 +67,28 @@ for fn,Lr in zip(filenames,lowranks):
         Ymax = np.max(Yin)
         Yn = Yin/Ymax
         # Get Max Intensity of each
-        Ynorm = np.linalg.norm(Yn, ord=np.inf, axis=2, keepdims=True)
+        Yninf = np.linalg.norm(Yn, ord=np.inf, axis=2, keepdims=True)
+        # Get Power of each pixel
+        Yn2 = np.linalg.norm(Yn, ord=2, axis=2, keepdims=True)
+        # Normalize Intensity
+        Ynorm = 1.
         Y = Yn/Ynorm
+
+        # plt.imshow(hsi2rgb(Y,rgb=True))
+        # plt.show()
+        # plt.imshow(Yninf/np.max(Yninf))
+        # plt.show()
 
         [I,J,K] = Y.shape
         [K,R] = Sgt.shape
-        IJ = np.maximum(I,J)
-        Lr = int( IJ**2 / (np.minimum(IJ,K)*R) )
-        # Lr = int( np.maximum(I,J)/R )
+        # if R > nem :
+        #     Sgt = Sgt[:,0:nem]
+        #     [K,R] = Sgt.shape
+        # elif nem > R:
+        #     Sgt2 = np.random.uniform(size=[K,nem])
+        #     Sgt2[:,0:R]=Sgt
+        #     Sgt=Sgt2
+        #     [K,R] = Sgt.shape
         print(fn)
         print(f'[I,J,K]=>[{I},{J},{K}]   [Lr,R]=>[{Lr},{R}]')
         parms.prnt()
@@ -92,34 +98,26 @@ for fn,Lr in zip(filenames,lowranks):
         for i in trials:
             # Instanciate Model
             model = LrModel(Y,Lr,R,seed=i,parms=parms)
-            results = model.run_optimizer()
-            (cost_vector, delta, it, et) = results
-            str1 = f'[I,J,K]=>[{I},{J},{K}]  [Lr,R]=>[{Lr},{R}] '
-            str2 = f'|{cost_vector[-1]:10.3e} |{delta:10.3e} '
-            str3 = f'|{it:10d} |{it/et:7.1f} |{et:5.0f}'
-            print(str1 + str2 + str3)
-            # plt.semilogy(cost_vector)
-            # plt.show()
-            
+            model.run_optimizer()
+
             # Compute endmembers using spatial components
             # and reconstructed tensor
             Sprime = get_endmembers(model, 
                 AbundanceThreshold,
-                norms=1.,
+                norms=Ynorm,
                 fromtarget=AbundanceFromTarget)
             (Sprime,p) = reorder(Sprime,Sgt)
-            # print(f'Reorder: {p}')
-            # plot_decomposition(model,Sgt,Sprime,p)
-            # plt.show()
+            plot_decomposition(model,Sgt,Sprime,p)
+            plt.show()
 
             # Compute Fully Constrained Least Squares
-            A = fcls_np(Y,Sprime,norms=Ynorm)
+            A = fcls_np(Yn,Sprime,norms=Ynorm)
             Agt = read_agt(matdict)
             nx = math.floor(matdict['nx'])
             mtx = compute_metrics(i,Sgt, Sprime, A, Agt)
             # plot_abundance(Agt,A,nx)
-            # plot_all(Agt,A,nx,model,Sgt,Sprime,p,Sname)
-            # plt.show()
+            plot_all(Agt,A,nx,model,Sgt,Sprime,p,Sname)
+            plt.show()
 
 
 ####################################################

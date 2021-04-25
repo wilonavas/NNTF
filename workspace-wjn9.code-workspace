@@ -5,7 +5,7 @@
 		}
 	],
 	"settings": {
-		"python.pythonPath": "C:\\Users\\wilo\\miniconda3\\envs\\tf\\python.exe",
+		"python.pythonPath": "C:\\Users\\WJN\\AppData\\Local\\Continuum\\miniconda3\\envs\\tf-mkl\\python.exe",
 		"jupyter.jupyterServerType": "local"
 	}
 }
